@@ -2,20 +2,28 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <script defer src="js/vue.js"></script>
     <script defer src="js/main.js"></script>
     <link rel="stylesheet" href="css/main.css">
-    <title>Kanban</title>
+    <title>Kanban Board</title>
 </head>
 <body>
 <div id="app">
     <div class="container">
-        <h1 class="title">MRbeast</h1>
+        <h1 class="board-title">Kanban Board</h1>
         <section class="board">
-
+            <kanban-column
+                    v-for="(column, index) in columns"
+                    :key="index"
+                    :column="column"
+                    :column-index="index"
+                    @add-task="addTask"
+                    @move-task="moveTask"
+                    @edit-task="editTask"
+                    @delete-task="deleteTask"
+            ></kanban-column>
         </section>
     </div>
 </div>
