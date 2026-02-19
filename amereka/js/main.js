@@ -1,180 +1,126 @@
-Vue.component('create-task', {
+Vue.component('kanban-column', {
     template: `
-   <form class="task-form" @submit.prevent="createTask">
-   <div class="task-form__inner">
-        <div class="task-form__inner">
-           <div class="task-name">
-               <p>Создание заметки</p>
-               <input class="task-form__input" id="title" type="text" v-model="title" placeholder="Название задачи">
-@@ -10,126 +10,160 @@
-               <div class="create-task__form">
-                   <p>Пункты списка</p>
-                   <button 
-                        class="create-task__btn"
-                        class="task__btn"
-                       type="button" 
-                       v-if="subtasks.length < 5" 
-                       @click="subtasks.push({ title: '', completed: false })"
-                   >
-                       Добавить
-                   </button>
+   <div class="board-column">
+           <h2 class="column-title">{{ column.title }}</h2>
+           <div class="task-wrapper">
+               <div class="task-card"></div>
+               <button>Создать задачу</button>
+               <div>
+                   <input placeholder="Заголовок задачи">
+                   <textarea placeholder="Описание задачи"></textarea>
+                   <input type="date">
+                   <button>Создать</button>
+                   <button>Отмена</button>
                </div>
-                <input class="task-form__input" v-for="(subtask, i) in subtasks" v-model="subtask.title" type="text" placeholder="Название пункта"></div>
-        <button class="create-task__btn" :disabled="!canCreate">Создать заметку</button>
-                <input class="task-form__input" v-for="(subtask, i) in subtasks" v-model="subtask.title" type="text" placeholder="Название пункта">
-            </div>
-        </div>
-        <button class="task__btn" :disabled="!canCreate">Создать заметку</button>
-   </form>
+       </div>
+   </div>
    `,
-    props: {
-        uniqueId: {
-            type: Number,
-            required: true,
-        }
-    },
-    data(){
+    props: ['column', 'columnIndex'],
+    data() {
         return {
-            title: '',
-            subtasks: []
-        }
-    },
-    computed: {
-        canCreate() {
-            return this.title.length && this.subtasks.length >= 3 && this.subtasks.length <= 5
+            showForm: false,
+            newTask: {
+                title: '',
+                description: '',
+                deadline: null,
+            }
         }
     },
     methods: {
         createTask() {
-            this.$emit('create-task', {
-                id: this.uniqueId,
-                title: this.title,
-                subtasks: this.subtasks,
-                finishedAt: null
-            })
+            const task = {
+                id: Date.now(),
+                title: this.newTask.title,
+                description: this.newTask.description,
+                deadline: this.newTask.deadline,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                status: 'planned',
+                isOverdue: false
+            }
+            this.$emit('move-task', task, this.columnIndex)
+            this.showForm = false
+            this.newTask = { title: '', description: '', deadline: null }
+        },
 
-            this.title = ''
-            this.subtasks = []
+        moveTask(task, newColumnIndex) {
+            this.$emit('move-task', task, newColumnIndex)
+        },
+        editTask(task) {
+            this.$emit('edit-task', task)
+        },
+        deleteTask(task) {
+            this.$emit('delete-task', task)
         }
     }
 })
 
+Vue.component('task-card', {
+    template: `
+       <div class="task">
+           <p class="task-title">{{ task.title }}</p>
+           <p class="task-description">{{ task.description }}</p>
+           <p class="task-deadline">Дэдлайн: {{ task.deadline }}</p>
+            <p class="task-created">Создана: {{ task.created }}</p>
+            <p class="task-updated">Последнее обновлоение{{ task.updated }}</p>
+            <p class="task-created">Создана: {{ task.createdAt }}</p>
+            <p class="task-updated">Последнее обновлоение{{ task.updatedAt }}</p>
+       </div>
+   `
+})
+
 let app = new Vue({
     el: '#app',
-
     data() {
         return {
-            tasks: []
+            columns: [
+                {
+                    title: 'Запланированные задачи',
+                    tasks: []
+                },
+                {
+                    title: 'Задачи в работе',
+                    tasks: []
+                },
+                {
+                    title: 'Тестирование',
+                    tasks: []
+                },
+                {
+                    title: 'Выполненные задачи',
+                    tasks: []
+                }
+            ],
+        },
+    ]
+    }
+}
+},
+methods: {
+    moveTask(task, newColumnIndex) {
+        const currentColumnIndex = this.columns.findIndex(column => column.tasks.includes(task))
+        if(currentColumnIndex !== -1) {
+            this.columns[currentColumnIndex].tasks = this.columns[currentColumnIndex].tasks.filter(t => t.id !== task.id)
+        }
+        task.status = ['planned', 'in-progress', 'testing', 'completed'][newColumnIndex]
+        task.updateAt = new Date()
+
+        if (newColumnIndex === 3) {
+            task.isOverdue = task.deadline && new Date(task.deadline) < new Date()
+        }
+        this.columns[newColumnIndex].tasks.push(task)
+    },
+    editTask(task) {
+        task.title = prompt('Введите новый заголовок: ', task.title) || task.title
+        task.description = prompt('Введите новое описание: ', task.description) || task.description
+        task.deadline = prompt('Введите новый дэдлайн (YYYY-MM-DD):', task.deadline) || task.deadline
+        task.updatedAt = new Date()
+    },
+    deleteTask(task) {
+        const columnIndex = this.columns.findIndex(column => column.tasks.includes(task))
+        if(columnIndex !== -1) {
+            this.columns[columnIndex].tasks = this.columns[columnIndex].tasks.filter(t => t.id !== task.id)
         }
     },
-
-    computed: {
-        columns() {
-            return [
-                {
-                    title: 'Новые',
-                    tasks: this.filteredColumn(this.tasks, 0, 50)
-                },
-                {
-                {
-                    title: 'В процессе',
-                    tasks: this.filteredColumn(this.tasks, 51, 99)
-                },
-                {
-                    title: 'Завершенные',
-                    tasks: this.filteredColumn(this.tasks, 100, 100)
-                },
-                {
-                    title: 'На доработку',
-                    tasks: this.tasks.filter(task => task.needsRework)
-                }
-            ]
-        },
-            queuedColumns() {
-                const queuedColumns = [];
-                this.columns.forEach((column, i) => {
-                    if (i !== 1) {
-                        queuedColumns.push(column);
-                        return;
-                    }
-
-                    const queuedTasks = column.tasks.reduce((acc, task, j) => {
-                        if (j < 5) acc.push(task);
-                        else queuedColumns[0].tasks.push(task);
-                        return acc;
-                    }, [])
-
-                    queuedColumns.push({ title: column.title, tasks: queuedTasks })
-                })
-                return queuedColumns;
-            },
-            uniqueId() {
-                return this.tasks.length + 1
-            }
-        },
-
-        methods: {
-            filteredColumn(tasks, min, max) {
-                return tasks.filter((task) => {
-                    const percentage = this.completedPercentage(task.subtasks)
-                    return percentage >= min && percentage <= max
-                })
-            },
-
-            completedPercentage(subtasks) {
-                return 100 * (subtasks.reduce((acc, subtasks) => acc + +subtasks.completed, 0) / (subtasks.length || 1))
-            },
-
-            onCompleteSubtask(task) {
-                onCompleteSubtask(task) {
-                    if (this.completedPercentage(task.subtasks) === 100) {
-                        task.finishedAt = new Date()
-                    }
-                },
-
-                formattedDate(str) {
-                    return new Intl.DateTimeFormat('ru-RU', {
-                        year: '2-digit',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                    }).format(new Date(str))
-                },
-
-                columnDisabled(columnIndex) {
-                    switch (columnIndex) {
-                        case 0: return this.columns[1].tasks.length >= 5
-                        case 2: return columnIndex === 2
-                    }
-                },
-
-                reworkTask(task) {
-                    task.needsRework = true
-                    task.subtasks.forEach(subtask => subtask.completed = false)
-                },
-
-                completeRework(task) {
-                    task.needsRework = false
-                    task.title = prompt('Переименуйте задачу: ', task.title) || task.title
-                    this.tasks.splice(this.tasks.indexOf(task), 1)
-                    this.tasks.unshift(task)
-                }
-            },
-
-
-            watch: {
-                tasks: {
-                    tasks: {
-                        handler(value) {
-                            localStorage.tasks = JSON.stringify(value)
-                        },
-                        deep: true
-                    }
-                },
-
-                mounted() {
-                    this.tasks = JSON.parse(localStorage.tasks ?? '[]')
-                    this.tasks = JSON.parse(localStorage.tasks ?? '[]')
-                }
-            })
+}
+})
